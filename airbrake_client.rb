@@ -26,14 +26,29 @@ class AirbrakeClient
       {
       :key => key,
       }.merge(options)
+    @pages = {}
+    @requested = []
   end
   def groups(page=1, error_types)
-    debug url = request_url('groups', :page => page)
+    next_page = @pages[page]
+    request_options = {:start => next_page}
+    return [] if next_page.nil? && page > 1
+    return [] if @requested.include?(next_page)
+    debug next_page
+    @requested << next_page
+    debug url = request_url('groups', request_options)
     response = make_request(url)
     case response.code.to_i
     when 200..299
       json = JSON.load(response.body)
-      # p number_of_error_on_next_page= json['succeeding']
+      previous_notice       = json['start']
+      # previous_notice_count = json['preceding']
+      next_notice           = json['end']
+      # next_notice_count     = json['succeeding']
+      @pages[page + 1] = next_notice
+      if @pages[page].nil?
+        @pages[page] = previous_notice
+      end
       groups = json['groups']
       errors = groups.select {|group|
         if error_types.empty?
@@ -144,7 +159,10 @@ class AirbrakeClient
     case response.code.to_i
     when 200..299
       json = JSON.load(response.body)
-      # p number_of_error_on_next_page= json['succeeding']
+      # previous_notice       = json['start']
+      # previous_notice_count = json['preceding']
+      # next_notice           = json['end']
+      # next_notice_count     = json['succeeding']
       notices = json['notices'].map {|n| GroupNotice.new(n) }
       notices.map {|notice|
         notice.to_hash
@@ -182,7 +200,7 @@ end
 
 if $0 == __FILE__
   require 'pp'
-  range = (1..10)
+  range = (1..30)
   error_types = ARGV.to_a
   key = ENV.fetch('AIRBRAKE_API_KEY')
   project_id = ENV.fetch('PROJECT_ID') do
@@ -217,7 +235,11 @@ if $0 == __FILE__
         hash[:type]
       end
       def message
-        @message ||= hash[:message].gsub(/:0x[0-9a-f]+/, ":object_id")
+        @message ||= hash[:message].
+          gsub(/:0x[0-9a-f]+/, ":object_id").
+          gsub(/([ (,]')[^']+('[ ),])/,'\1xstringx\2').
+          gsub(/([ (,]")[^"]+("[ ),]) /,'\1xstringx\2').
+          gsub(/([=><`]\s{1,3})\d+/, '\11number1')
       end
       def backtrace
         hash[:backtrace]
