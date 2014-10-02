@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+result=0
+for project in \
+  "1234 a_nice_name" \
+  "5678 this_never_crashes"
+do
+  set -- $project  # Parses variable "project"
+                   # and sets positional parameters.
+                   # The "--" prevents nasty surprises
+                   # if $project is null or
+                   # begins with a dash.
+  (
+    echo -e '\n'
+    echo "Processing project $1 ($2)"
+    cmd="time INCLUDE_RESOLVED=true PROJECT_ID=$1 PROJECT_NAME=$2 ruby airbrake_client.rb > report-$2.txt"
+    echo $cmd
+    echo -e '\n'
+    eval $cmd
+    echo -e '\n'
+    echo -e '\n'
+  )
+  result+=$?
+done
+if [ $result -eq 0 ]; then
+    echo "SUCCESS"
+else
+    echo "FAILURE"
+fi
+
+exit $result
