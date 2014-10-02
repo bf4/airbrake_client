@@ -212,14 +212,6 @@ if $0 == __FILE__
     fail 'missing PROJECT_ID'
   end
 
-  puts "getting resolved groups"
-  client = AirbrakeClient.new(key, project_id, :resolved => 'true', :environment => 'production')
-  resolved_groups = range.flat_map {|page|
-    print '.'
-    client.groups(page, error_types)
-  }.compact.uniq
-  puts
-
   puts "getting unresolved groups"
   client = AirbrakeClient.new(key, project_id, :resolved => 'false', :environment => 'production')
   unresolved_groups = range.flat_map {|page|
@@ -228,7 +220,18 @@ if $0 == __FILE__
   }.compact.uniq
   puts
 
-  groups = resolved_groups | unresolved_groups
+  if ENV['INCLUDE_RESOLVED'] =~ /true/i
+    puts "getting resolved groups"
+    client = AirbrakeClient.new(key, project_id, :resolved => 'true', :environment => 'production')
+    resolved_groups = range.flat_map {|page|
+      print '.'
+      client.groups(page, error_types)
+    }.compact.uniq
+    puts
+    groups = resolved_groups | unresolved_groups
+  else
+    groups = unresolved_groups
+  end
   puts "got groups #{groups}"
 
   puts "getting errors"
