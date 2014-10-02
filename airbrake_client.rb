@@ -49,6 +49,16 @@ class AirbrakeClient
       if @pages[page].nil?
         @pages[page] = previous_notice
       end
+    # json['groups'].each
+    # def last_notice_at
+    #   notice['lastNoticeAt']
+    # end
+    # def notice_count
+    #   notice['noticeCount']
+    # end
+    # def notice_total_count
+    #   json['noticeTotalCount']
+    # end
       groups = json['groups']
       errors = groups.select {|group|
         if error_types.empty?
@@ -105,6 +115,7 @@ class AirbrakeClient
     def errors
       @errors ||= notice['errors'].map {|e| Error.new(e) }
     end
+    # production
     def environment
       notice['environment']
     end
@@ -117,19 +128,6 @@ class AirbrakeClient
     # date/time
     def created_at
       notice['createdAt']
-    end
-    def last_notice_at
-      notice['lastNoticeAt']
-    end
-    def notice_count
-      notice['noticeCount']
-    end
-    def notice_total_count
-      notice['noticeTotalCount']
-    end
-    # production
-    def environment
-      notice['environment']
     end
     # v1/balances
     def component
@@ -268,6 +266,9 @@ if $0 == __FILE__
     def errors
       @errors ||= hash[:errors].map {|e| Error.new(e) }
     end
+    def created_at
+      hash[:created_at]
+    end
     def inspect
       "<GroupErrors: #{hash.inspect}>"
     end
@@ -288,12 +289,14 @@ if $0 == __FILE__
     file.close
   end
 
-  @exceptions = Hash.new {|line,h| line[h] = [] } # Hash<line,Array<message>>
+  @exceptions = Hash.new {|h,line| h[line] = [] } # Hash<line,Array<message>>
+  @exception_stats  = Hash.new {|h,type| h[type] = [] } # Hash<type,Array<created_at>>
   puts "Max errors per type: #{range.size*2}"
   errors_by_type.each do |type, group_errors|
     puts
     puts "*"*8
     puts type
+    @exception_stats[type].concat group_errors.map(&:created_at)
     group_errors.flat_map(&:errors).group_by(&:identifier).map do |trace, error|
       error.each do |e|
         first_line, first_app_line = e.backtrace
@@ -316,6 +319,14 @@ if $0 == __FILE__
         messages.count,
         messages.compact.sort.uniq.inspect
       ]
+    end
+  end
+  output = "exception_stats_#{project_id}.txt"
+  puts "Exceptions stats: #{output}"
+  File.open(output, "w") do |io|
+    @exception_stats.sort.each do |type, created_ats|
+      first_notice, last_notice = created_ats.compact.sort.uniq.tap {|a| break [a.first, a.last] }
+      io.puts "%s\t%s\t%s\t%s" % [type, created_ats.count, first_notice, last_notice]
     end
   end
 end
