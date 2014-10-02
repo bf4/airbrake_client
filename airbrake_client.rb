@@ -86,11 +86,16 @@ class AirbrakeClient
       def backtrace
         @backtrace ||= error['backtrace'].map {|bcl| BacktraceLine.new(bcl) }
       end
+      def exception_source
+        backtrace.find{|i|
+          i.file.to_s.include?("[PROJECT_ROOT]") and not i.file.to_s.include?("vendor/bundle")
+        }.to_s
+      end
       def to_hash
         {
           type: type,
           message: message,
-          backtrace: [backtrace.first.to_s,backtrace.find{|i| i.file.to_s.include?("[PROJECT_ROOT]") and not i.file.to_s.include?("vendor/bundle") }.to_s].inspect
+          backtrace: [backtrace.first.to_s, exception_source]
         }
       end
     end
@@ -245,7 +250,7 @@ if $0 == __FILE__
         hash[:backtrace]
       end
       def identifier
-        [message, backtrace]
+        backtrace.inspect
       end
     end
     def params
@@ -280,16 +285,34 @@ if $0 == __FILE__
     file.close
   end
 
+  @exceptions = Hash.new {|line,h| line[h] = [] } # Hash<line,Array<message>>
   puts "Max errors per type: #{range.size*2}"
   errors_by_type.each do |type, group_errors|
     puts
     puts "*"*8
     puts type
-    group_errors.flat_map(&:errors).group_by(&:backtrace).map do |trace, error|
+    group_errors.flat_map(&:errors).group_by(&:identifier).map do |trace, error|
+      error.each do |e|
+        first_line, first_app_line = e.backtrace
+        source = first_app_line.empty? ? first_line : first_app_line
+        @exceptions[source] << e.message
+      end
       [error.count, trace, error.map(&:message).uniq]
     end.sort.reverse.each do |item|
       count, trace, messages = item
       puts %{\n#{count} errors: \n\t#{messages.map{|m| m[0..400] }.join("\n\t\t")}\n\t#{trace}}
+    end
+  end
+  puts
+  output = "exceptions_#{project_id}.txt"
+  puts "Exceptions by source: #{output}"
+  File.open(output, "w") do |io|
+    @exceptions.sort {|(a,_),(b,_)| a.to_s <=> b.to_s }.each do |line, messages|
+      io.puts "%s\t%s\t%s" % [
+        line,
+        messages.count,
+        messages.compact.sort.uniq.inspect
+      ]
     end
   end
 end
