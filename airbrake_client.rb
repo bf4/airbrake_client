@@ -74,7 +74,7 @@ class AirbrakeClient
         def line; bcl['line']; end
         def column; bcl['column']; end
         def to_s
-          "#{file}:#{line}:#{column}"
+          "#{file}:#{line}:#{column}:::#{function}"
         end
       end
       def type
