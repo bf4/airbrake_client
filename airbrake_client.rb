@@ -260,11 +260,21 @@ if $0 == __FILE__
     def errors
       @errors ||= hash[:errors].map {|e| Error.new(e) }
     end
+    def inspect
+      "<GroupErrors: #{hash.inspect}>"
+    end
+  end
+  if error_filter = ENV['ERROR_FILTER']
+    ge_filter = ->(ge){ge.inspect =~ /#{error_filter}/o && ge }
+  else
+    ge_filter = ->(ge){ ge }
   end
   begin
     file = File.open("report.yml","w")
     errors_by_type = groups.flat_map { |group_id|
-      client.group_errors(group_id).map{|e| file.write(e.to_yaml); GroupErrors.new(e) }
+      client.group_errors(group_id).map{|e|
+        ge_filter.(GroupErrors.new(e))
+      }.compact
     }.group_by {|ge| ge.types.first }
   ensure
     file.close
