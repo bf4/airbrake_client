@@ -209,6 +209,7 @@ if $0 == __FILE__
   project_id = ENV.fetch('PROJECT_ID') do
     fail 'missing PROJECT_ID'
   end
+  project_name = ENV.fetch('PROJECT_NAME') { '' }
 
   puts "getting unresolved groups"
   client = AirbrakeClient.new(key, project_id, :resolved => 'false', :environment => 'production')
@@ -310,7 +311,7 @@ if $0 == __FILE__
     end
   end
   puts
-  output = "exceptions_#{project_id}.txt"
+  output = "exceptions_#{project_id}#{'-' << project_name unless project_name.empty?}.txt"
   puts "Exceptions by source: #{output}"
   File.open(output, "w") do |io|
     @exceptions.sort {|(a,_),(b,_)| a.to_s <=> b.to_s }.each do |line, messages|
@@ -321,7 +322,7 @@ if $0 == __FILE__
       ]
     end
   end
-  output = "exception_stats_#{project_id}.txt"
+  output = "exception_stats_#{project_id}#{'-' << project_name unless project_name.empty?}.txt"
   puts "Exceptions stats: #{output}"
   File.open(output, "w") do |io|
     @exception_stats.sort.each do |type, created_ats|
