@@ -300,7 +300,7 @@ if $0 == __FILE__
       [error.count, trace, error.map(&:message).uniq]
     end.sort.reverse.each do |item|
       count, trace, messages = item
-      puts %{\n#{count} errors: \n\t#{messages.map{|m| m[0..400] }.join("\n\t\t")}\n\t#{trace}}
+      puts %(\n#{count} errors: \n\t#{messages.map{|m| m[0..400] }.join("\n\t\t")}\n\t#{trace})
     end
   end
   puts
